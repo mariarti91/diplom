@@ -3,3 +3,5 @@ server/bin/*
 *.user
 
 *.o
+
+*.autosave
