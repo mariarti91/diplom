@@ -34,3 +34,9 @@ QMap<QString, ClientAddress>* MyServer::getClientsList()
 {
     return &clients;
 }
+//----------------------------------------------------------------------------
+
+void MyServer::timerEvent(QTimerEvent *event)
+{
+
+}

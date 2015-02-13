@@ -4,6 +4,8 @@
 #include <QObject>
 #include <QString>
 #include <QMap>
+#include <QTcpServer>
+#include <QTimerEvent>
 
 struct ClientAddress
 {
@@ -26,6 +28,7 @@ public:
 
 private:
     QMap<QString, ClientAddress> clients;
+    void timerEvent(QTimerEvent* event);
 
 signals:
 
