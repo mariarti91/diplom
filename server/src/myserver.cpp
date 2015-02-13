@@ -16,6 +16,7 @@ ClientAddress::~ClientAddress(){}
 MyServer::MyServer(QObject *parent) :
     QObject(parent)
 {
+    startTimer(10000);
 }
 //----------------------------------------------------------------------------
 

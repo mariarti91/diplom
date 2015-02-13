@@ -7,6 +7,8 @@
 #include <QTcpServer>
 #include <QTimerEvent>
 
+#include "clientsock.h"
+
 struct ClientAddress
 {
     ClientAddress();
