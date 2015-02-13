@@ -16,8 +16,13 @@ TEMPLATE = app
 
 
 SOURCES += ../src/main.cpp\
-        ../src/mainwindow.cpp
+        ../src/mainwindow.cpp\
+        ../src/myserver.cpp \
+    ../src/adduserdialog.cpp
 
-HEADERS  += ../src/mainwindow.h
+HEADERS  += ../src/mainwindow.h\
+        ../src/myserver.h \
+    ../src/adduserdialog.h
 
-FORMS    += ../src/mainwindow.ui
+FORMS    += ../src/mainwindow.ui \
+    ../src/adduserdialog.ui

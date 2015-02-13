@@ -3,6 +3,9 @@
 
 #include <QMainWindow>
 
+#include "myserver.h"
+#include "adduserdialog.h"
+
 namespace Ui {
 class MainWindow;
 }
@@ -17,6 +20,9 @@ public:
 
 private:
     Ui::MainWindow *ui;
+    MyServer server;
+public slots:
+    void slotAddClientPbCliced();
 };
 
 #endif // MAINWINDOW_H
