@@ -5,3 +5,23 @@ server/bin/*
 *.o
 
 *.autosave
+
+*.aux
+
+*.out
+
+*.pdf
+
+*.toc
+
+*.backup
+
+*.log
+
+*.png
+
+*.bib~*
+
+*.blg
+
+*.bbl
