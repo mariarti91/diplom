@@ -34,8 +34,9 @@ ClientSock::~ClientSock()
 
 void ClientSock::initSc(const QString &addr, const int &port)
 {
-    sc->connectToHost(addr, port);
     connect(sc, SIGNAL(readyRead()), this, SLOT(getData()));
+    sc->connectToHost(addr, port);
+    sc->waitForConnected();
 }
 //--------------------------------------------------------------------
 
@@ -58,6 +59,7 @@ void ClientSock::sendData(QByteArray data)
     if(sc->state() == QAbstractSocket::ConnectedState)
     {
         sc->write(data);
+        sc->waitForBytesWritten();
     }
 }
 //--------------------------------------------------------------------
