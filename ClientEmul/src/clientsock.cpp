@@ -66,9 +66,9 @@ void ClientSock::timerEvent(QTimerEvent *event)
 {
     if(sc->state() == QAbstractSocket::UnconnectedState)
     {
-        emit scDisconnect(m_qsScName);
         killTimer(event->timerId());
         std::cout << m_qsScName.toStdString() << " status: CLOSED" << std::endl;
+        emit scDisconnect(m_qsScName);
     }
     else
     {

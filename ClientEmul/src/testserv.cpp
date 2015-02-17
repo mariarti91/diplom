@@ -33,6 +33,7 @@ void TestServ::newConnection()
     //users.push_front(srv->nextPendingConnection());
     ClientSock * sock = new ClientSock(srv->nextPendingConnection());
     connect(sock, SIGNAL(scDisconnect(QString)), this, SLOT(connectClosed(QString)));
+    users.insert(sock->getName(), sock);
 }
 //----------------------------------------------------------
 
