@@ -1,0 +1,8 @@
+#ifndef GLOBALDEFINES_H
+#define GLOBALDEFINES_H
+
+#define NORMAL_TO 6000
+#define ERROR_TO 5000
+#define SC_COUNT 3
+
+#endif // GLOBALDEFINES_H
