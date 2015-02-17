@@ -31,3 +31,5 @@ Makefile
 moc_*.cpp
 
 ui_*.h
+
+*.dvi
