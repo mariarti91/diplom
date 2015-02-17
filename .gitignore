@@ -1,4 +1,6 @@
-server/bin/*
+*.bin
+
+Makefile
 
 *.user
 
@@ -25,3 +27,7 @@ server/bin/*
 *.blg
 
 *.bbl
+
+moc_*.cpp
+
+ui_*.h
