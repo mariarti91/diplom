@@ -43,6 +43,19 @@ QByteArray ClientSock::getData()
 {
     QByteArray buf(sc->readAll());
     std::cout << m_qsScName.toStdString() << ": " << QString(buf).toStdString() << std::endl;
+    quint16 uspdId = 0x0003;
+    QString uspdData("it's USPD status");
+    QString uuData("it's UU data");
+    QByteArray responce;
+    QDataStream res(&responce, QIODevice::WriteOnly);
+    //responce.append(uspdId);
+    //responce.append(uspdData.length());
+    //responce.append(uspdData);
+    //responce.append(uuData.length());
+    //responce.append(uuData);
+    res << uspdId << uspdData.toUtf8() << uuData.toUtf8();
+    sendData(responce);
+    this->deleteLater();
     return buf;
 }
 //--------------------------------------------------------------------
@@ -58,6 +71,7 @@ void ClientSock::sendData(QByteArray data)
     if(sc->state() == QAbstractSocket::ConnectedState)
     {
         sc->write(data);
+        sc->waitForBytesWritten();
     }
 }
 //--------------------------------------------------------------------
