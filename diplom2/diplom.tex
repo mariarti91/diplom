@@ -1,0 +1,58 @@
+\input{config}
+
+\begin{document}
+ \input{title}
+ \input{essay}
+ \input{essay_en}
+ \input{quest}
+ \newpage
+ \tableofcontents
+ \vspace{1cm}
+ \begin{minipage}[left]{0.6\linewidth}
+  Компакт диск: \\
+  Пояснительная записка в формате PDF
+ \end{minipage}
+ \hfill
+ \begin{minipage}[right]{0.3\linewidth}
+  В конверте на обороте обложки 
+ \end{minipage}
+ 
+ \vspace{1cm}
+ 
+ \begin{minipage}[left]{0.6\linewidth}
+  Графический материал \\ (демонстрационные листы):
+ \end{minipage}
+ \hfill
+ \begin{minipage}[right]{0.3\linewidth}
+  На отдельных листах
+ \end{minipage}
+ 
+ \vspace{1cm}
+ 
+ Плакат 1
+ 
+ Плакат 2
+ 
+ Плакат 3
+ 
+ Плакат 4
+ 
+ Плакат 5 Технико-экономическое обоснование
+ 
+ \input{intro}
+ \input{askueReview} %описание ССД и УСПД, тут же требования к взаимодействию??? 
+ \input{input_output} % описание входных и выходных данных
+ \input{threats_model} % модель угроз + механизмы защиты
+ \input{protocols} % аналоги С УКАЗАНИЕМ ЧЕГО В НИХ НЕ ТАК!!! + своя концепция
+ \input{tests} % тестирование
+ \input{uspd_comands}
+ \input{ololo_eco}
+ \input{OT}
+ \input{closing}
+ \newpage
+ \addcontentsline{toc}{section}{Список использованных источников}
+ \renewcommand{\refname}{\hfill Список использованных источников \hfill}
+ \bibliography{lit}
+ \input{addon_a}
+\end{document}
+
