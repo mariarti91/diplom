@@ -47,8 +47,9 @@
 \titleformat{\subsubsection}{\normalfont\normalsize\centering}{\thesubsubsection}{1.0em}{}
 \titleformat{\paragraph}{\normalfont\normalsize\centering}{\theparagraph}{1.0em}{}
 
-% - Оставим место под ТЗ 
-%\setcounter{page}{4}
+% - номер ``первой'' страницы
+\setcounter{page}{51}
+\setcounter{section}{8}
 
 % - Для больших таблиц
 \usepackage{longtable}
@@ -101,6 +102,12 @@
 
 %фамилии для рамок
 \author{Никифоров Д.С.}
-\ESKDchecker{Конев А.А.}
+\ESKDchecker{Сопов М.А.}
 \ESKDnormContr{Илюшкин В.А.}
 \ESKDapprovedBy{Шелупанов А.А.}
+
+\begin{document}
+ \input{OT}
+ \newpage
+ \setcounter{page}{9}
+\end{document}
