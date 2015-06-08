@@ -1,0 +1,264 @@
+\ESKDappendix{Справочное}{\normalfont Исходные коды эмулятора УСПД \label{app:code_uspd}}
+
+main.cpp:
+
+\begin{lstlisting}
+#include <QCoreApplication>
+#include <iostream>
+
+#include "clientsock.h"
+#include "testserv.h"
+
+int main(int argc, char** argv)
+{
+	QCoreApplication app(argc, argv);
+    TestServ serv;
+    serv.initServ(QString(argv[1]).toInt());
+	return app.exec();
+}
+
+\end{lstlisting}
+
+clientsock.h:
+
+\begin{lstlisting}
+#ifndef CLIENTSOCK_H
+#define CLIENTSOCK_H
+
+#include <QObject>
+#include <QString>
+#include <QTcpSocket>
+#include <QTimer>
+#include <QTimerEvent>
+#include <iostream>
+
+#include "globaldefines.h"
+
+class ClientSock : public QObject
+{
+    Q_OBJECT
+public:
+    explicit ClientSock(QObject *parent = 0);
+    explicit ClientSock(QString addr, int port, QObject *parent = 0);
+    explicit ClientSock(QTcpSocket *sock, QObject *parent = 0);
+    ~ClientSock();
+    void initSc(const QString & addr, const int & port);
+    void setName(const QString & name);
+    QString getName();
+    void sendData(QByteArray data);
+    void timerEvent(QTimerEvent *event);
+private:
+    QTcpSocket * sc;
+    QString m_qsScName;
+signals:
+    void scDisconnect(QString);
+public slots:
+    QByteArray getData();
+};
+
+#endif // CLIENTSOCK_H
+
+\end{lstlisting}
+
+globaldefines.h:
+
+\begin{lstlisting}
+#ifndef GLOBALDEFINES_H
+#define GLOBALDEFINES_H
+
+#define NORMAL_TO 6000
+#define ERROR_TO 5000
+#define SC_COUNT 3
+
+#endif // GLOBALDEFINES_H
+
+\end{lstlisting}
+
+clientsock.cpp:
+
+\begin{lstlisting}
+#include "clientsock.h"
+
+ClientSock::ClientSock(QObject *parent) :
+    QObject(parent)
+{
+    sc = new QTcpSocket(this);
+}
+//--------------------------------------------------------------------
+
+ClientSock::ClientSock(QString addr, int port, QObject *parent) :
+    QObject(parent)
+{
+    sc = new QTcpSocket(this);
+    initSc(addr, port);
+}
+//--------------------------------------------------------------------
+
+ClientSock::ClientSock(QTcpSocket *sock, QObject *parent) :
+    QObject(parent)
+{
+    sc = sock;
+    this->setName(QString("%1").arg(sock->peerPort()));
+    connect(sc, SIGNAL(readyRead()), this, SLOT(getData()));
+    startTimer(5000);
+}
+
+//--------------------------------------------------------------------
+
+ClientSock::~ClientSock()
+{
+    delete sc;
+}
+//--------------------------------------------------------------------
+
+void ClientSock::initSc(const QString &addr, const int &port)
+{
+    sc->connectToHost(addr, port);
+    connect(sc, SIGNAL(readyRead()), this, SLOT(getData()));
+}
+//--------------------------------------------------------------------
+
+QByteArray ClientSock::getData()
+{
+    QByteArray buf(sc->readAll());
+    std::cout << m_qsScName.toStdString() << ": " << QString(buf).toStdString() << std::endl;
+    quint16 uspdId = 0x0003;
+    QString uspdData("it's USPD status");
+    QString uuData("it's UU data");
+    QByteArray responce;
+    QDataStream res(&responce, QIODevice::WriteOnly);
+    //responce.append(uspdId);
+    //responce.append(uspdData.length());
+    //responce.append(uspdData);
+    //responce.append(uuData.length());
+    //responce.append(uuData);
+    res << uspdId << uspdData.toUtf8() << uuData.toUtf8();
+    sendData(responce);
+    this->deleteLater();
+    return buf;
+}
+//--------------------------------------------------------------------
+
+void ClientSock::setName(const QString &name)
+{
+    m_qsScName = name;
+}
+//--------------------------------------------------------------------
+
+void ClientSock::sendData(QByteArray data)
+{
+    if(sc->state() == QAbstractSocket::ConnectedState)
+    {
+        sc->write(data);
+        sc->waitForBytesWritten();
+    }
+}
+//--------------------------------------------------------------------
+
+void ClientSock::timerEvent(QTimerEvent *event)
+{
+    if(sc->state() == QAbstractSocket::UnconnectedState)
+    {
+        killTimer(event->timerId());
+        std::cout << m_qsScName.toStdString() << " status: CLOSED" << std::endl;
+        emit scDisconnect(m_qsScName);
+    }
+    else
+    {
+        //std::cout << m_qsScName.toStdString() << " status: OK" << std::endl;
+    }
+}
+//--------------------------------------------------------------------
+
+QString ClientSock::getName()
+{
+    return m_qsScName;
+}
+//--------------------------------------------------------------------
+
+\end{lstlisting}
+
+testserv.h:
+
+\begin{lstlisting}
+#ifndef TESTSERV_H
+#define TESTSERV_H
+
+#include <QObject>
+#include <QTcpServer>
+#include <iostream>
+
+#include "clientsock.h"
+
+class TestServ : public QObject
+{
+    Q_OBJECT
+public:
+    explicit TestServ(QObject *parent = 0);
+    ~TestServ();
+
+    void initServ(const int &port);
+
+private:
+    QTcpServer *srv;
+    QMap<QString, ClientSock*> users;
+signals:
+
+public slots:
+    void newConnection();
+    void connectClosed(QString name);
+};
+
+#endif // TESTSERV_H
+
+\end{lstlisting}
+
+testserv.cpp:
+
+\begin{lstlisting}
+#include "testserv.h"
+
+TestServ::TestServ(QObject *parent) :
+    QObject(parent)
+{
+    srv = new QTcpServer(this);
+    connect(srv, SIGNAL(newConnection()), this, SLOT(newConnection()));
+}
+//----------------------------------------------------------
+
+TestServ::~TestServ()
+{
+    delete srv;
+}
+//----------------------------------------------------------
+
+void TestServ::initServ(const int &port)
+{
+    if(srv->listen(QHostAddress::Any, port))
+    {
+        std::cout << "server up!" << std::endl;
+    }
+    else
+    {
+        std::cout << "ooooooooooops!!!!!" << std::endl;
+    }
+}
+//----------------------------------------------------------
+
+void TestServ::newConnection()
+{
+    std::cout << "get connection =)" << std::endl;
+    //users.push_front(srv->nextPendingConnection());
+    ClientSock * sock = new ClientSock(srv->nextPendingConnection());
+    connect(sock, SIGNAL(scDisconnect(QString)), this, SLOT(connectClosed(QString)));
+    users.insert(sock->getName(), sock);
+}
+//----------------------------------------------------------
+
+void TestServ::connectClosed(QString name)
+{
+    delete users.value(name);
+    users.remove(name);
+}
+
+\end{lstlisting}
