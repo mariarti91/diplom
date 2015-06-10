@@ -1,0 +1,401 @@
+\ESKDappendix{Справочное}{\normalfont Исходные коды эмулятора ССД \label{app:code_ssd}}
+
+main.cpp
+
+\begin{lstlisting}
+#include "mainwindow.h"
+#include <QApplication>
+
+int main(int argc, char *argv[])
+{
+    QApplication a(argc, argv);
+    MainWindow w;
+    w.show();
+    return a.exec();
+}
+\end{lstlisting}
+
+mainwindow.h:
+
+\begin{lstlisting}
+#ifndef MAINWINDOW_H
+#define MAINWINDOW_H
+
+#include <QMainWindow>
+#include <QStandardItemModel>
+
+#include "myserver.h"
+#include "adduserdialog.h"
+
+namespace Ui {
+class MainWindow;
+}
+
+class MainWindow : public QMainWindow
+{
+    Q_OBJECT
+
+public:
+    explicit MainWindow(QWidget *parent = 0);
+    ~MainWindow();
+
+private:
+    Ui::MainWindow *ui;
+    MyServer server;
+public slots:
+    void slotAddClientPbCliced();
+};
+
+#endif // MAINWINDOW_H
+\end{lstlisting}
+
+mainwindow.cpp:
+
+\begin{lstlisting}
+#include "mainwindow.h"
+#include "ui_mainwindow.h"
+
+MainWindow::MainWindow(QWidget *parent) :
+    QMainWindow(parent),
+    ui(new Ui::MainWindow)
+{
+    ui->setupUi(this);
+}
+//--------------------------------------------------------------------------
+
+MainWindow::~MainWindow()
+{
+    delete ui;
+}
+//--------------------------------------------------------------------------
+
+void MainWindow::slotAddClientPbCliced()
+{
+    AddUserDialog d(this);
+    if(d.exec())
+    {
+        server.addClient(d.getClientName(), d.getClientAddress(), d.getClientPort());
+
+        QMap<QString,ClientAddress>* buf = server.getClientsList();
+        QStandardItemModel *model = new QStandardItemModel(buf->count(), 3, ui->tvClients);
+        ui->tvClients->setModel(model);
+        ui->teClients->clear();
+        int rowCount = 0;
+        foreach (QString client, buf->keys())
+        {
+            QStandardItem* name = new QStandardItem(client);
+            QStandardItem* addr = new QStandardItem(buf->value(client).addr);
+            QStandardItem* port = new QStandardItem(tr("%1").arg(buf->value(client).port));
+            model->setItem(rowCount, 0, name);
+            model->setItem(rowCount, 1, addr);
+            model->setItem(rowCount, 2, port);
+            rowCount++;
+        }
+    }
+    else
+    {
+        //ui->teClients->setText("CANCEL");
+    }
+}
+//--------------------------------------------------------------------------
+\end{lstlisting}
+
+myserver.h:
+
+\begin{lstlisting}
+#ifndef MYSERVER_H
+#define MYSERVER_H
+
+#include <QObject>
+#include <QString>
+#include <QMap>
+#include <QTcpServer>
+#include <QTimerEvent>
+
+#include "clientsock.h"
+
+struct ClientAddress
+{
+    ClientAddress();
+    ClientAddress(const QString&, const int&);
+    ~ClientAddress();
+    QString addr;
+    int port;
+};
+
+class MyServer : public QObject
+{
+    Q_OBJECT
+public:
+    explicit MyServer(QObject *parent = 0);
+    ~MyServer();
+
+    void addClient(const QString &name, const QString &addr, const int &port);
+    QMap<QString, ClientAddress>* getClientsList();
+
+private:
+    QMap<QString, ClientAddress> clients;
+    void timerEvent(QTimerEvent* event);
+
+signals:
+
+public slots:
+
+};
+
+#endif // MYSERVER_H
+\end{lstlisting}
+
+myserver.cpp:
+
+\begin{lstlisting}
+#include "myserver.h"
+
+ClientAddress::ClientAddress(){}
+//----------------------------------------------------------------------------
+
+ClientAddress::ClientAddress(const QString & a, const int & p)
+{
+    this->addr = a;
+    this->port = p;
+}
+//----------------------------------------------------------------------------
+
+ClientAddress::~ClientAddress(){}
+//============================================================================
+
+MyServer::MyServer(QObject *parent) :
+    QObject(parent)
+{
+    startTimer(10000);
+}
+//----------------------------------------------------------------------------
+
+MyServer::~MyServer(){}
+//----------------------------------------------------------------------------
+
+void MyServer::addClient(const QString &name,
+                         const QString &addr,
+                         const int &port)
+{
+    clients.insert(name, ClientAddress(addr, port));
+}
+//----------------------------------------------------------------------------
+
+QMap<QString, ClientAddress>* MyServer::getClientsList()
+{
+    return &clients;
+}
+//----------------------------------------------------------------------------
+
+void MyServer::timerEvent(QTimerEvent *event)
+{
+    std::cout << "event!" << std::endl;
+    foreach (QString name, this->clients.keys())
+    {
+        //ClientSock sc(clients.value(name).addr, clients.value(name).port);
+        //sc.setName(name);
+        //sc.sendData("test");
+        ClientSock* sc = new ClientSock(clients.value(name).addr, clients.value(name).port);
+        sc->setName(name);
+        sc->sendData("get_request");
+    }
+}
+//----------------------------------------------------------------------------
+\end{lstlisting}
+
+clientsock.h:
+
+\begin{lstlisting}
+#ifndef CLIENTSOCK_H
+#define CLIENTSOCK_H
+
+#include <QObject>
+#include <QString>
+#include <QTcpSocket>
+#include <QTimer>
+#include <QTimerEvent>
+#include <iostream>
+
+class ClientSock : public QObject
+{
+    Q_OBJECT
+public:
+    explicit ClientSock(QObject *parent = 0);
+    explicit ClientSock(QString addr, int port, QObject *parent = 0);
+    explicit ClientSock(QTcpSocket *sock, QObject *parent = 0);
+    ~ClientSock();
+    void initSc(const QString & addr, const int & port);
+    void setName(const QString & name);
+    QString getName();
+    void sendData(QByteArray data);
+    void timerEvent(QTimerEvent *event);
+private:
+    QTcpSocket * sc;
+    QString m_qsScName;
+signals:
+    void scDisconnect(QString);
+public slots:
+    QByteArray getData();
+};
+
+#endif // CLIENTSOCK_H
+\end{lstlisting}
+
+clientsock.cpp:
+
+\begin{lstlisting}
+#include "clientsock.h"
+
+ClientSock::ClientSock(QObject *parent) :
+    QObject(parent)
+{
+    sc = new QTcpSocket(this);
+}
+//--------------------------------------------------------------------
+
+ClientSock::ClientSock(QString addr, int port, QObject *parent) :
+    QObject(parent)
+{
+    sc = new QTcpSocket(this);
+    initSc(addr, port);
+}
+//--------------------------------------------------------------------
+
+ClientSock::ClientSock(QTcpSocket *sock, QObject *parent) :
+    QObject(parent)
+{
+    sc = sock;
+    this->setName(QString("%1").arg(sock->peerPort()));
+    connect(sc, SIGNAL(readyRead()), this, SLOT(getData()));
+    startTimer(5000);
+}
+
+//--------------------------------------------------------------------
+
+ClientSock::~ClientSock()
+{
+    delete sc;
+}
+//--------------------------------------------------------------------
+
+void ClientSock::initSc(const QString &addr, const int &port)
+{
+    connect(sc, SIGNAL(readyRead()), this, SLOT(getData()));
+    sc->connectToHost(addr, port);
+    sc->waitForConnected();
+}
+//--------------------------------------------------------------------
+
+QByteArray ClientSock::getData()
+{
+    QByteArray buf(sc->readAll());
+    std::cout << m_qsScName.toStdString() << ": " << QString(buf).toStdString() << std::endl;
+    return buf;
+}
+//--------------------------------------------------------------------
+
+void ClientSock::setName(const QString &name)
+{
+    m_qsScName = name;
+}
+//--------------------------------------------------------------------
+
+void ClientSock::sendData(QByteArray data)
+{
+    if(sc->state() == QAbstractSocket::ConnectedState)
+    {
+        sc->write(data);
+        sc->waitForBytesWritten();
+    }
+}
+//--------------------------------------------------------------------
+
+void ClientSock::timerEvent(QTimerEvent *event)
+{
+    if(sc->state() == QAbstractSocket::UnconnectedState)
+    {
+        emit scDisconnect(m_qsScName);
+        killTimer(event->timerId());
+        std::cout << m_qsScName.toStdString() << " status: CLOSED" << std::endl;
+    }
+    else
+    {
+        //std::cout << m_qsScName.toStdString() << " status: OK" << std::endl;
+    }
+}
+//--------------------------------------------------------------------
+
+QString ClientSock::getName()
+{
+    return m_qsScName;
+}
+//--------------------------------------------------------------------
+\end{lstlisting}
+
+adduserdialog.h:
+
+\begin{lstlisting}
+#ifndef ADDUSERDIALOG_H
+#define ADDUSERDIALOG_H
+
+#include <QDialog>
+
+namespace Ui {
+class AddUserDialog;
+}
+
+class AddUserDialog : public QDialog
+{
+    Q_OBJECT
+
+public:
+    explicit AddUserDialog(QWidget *parent = 0);
+    ~AddUserDialog();
+    QString getClientName();
+    QString getClientAddress();
+    int getClientPort();
+
+private:
+    Ui::AddUserDialog *ui;
+};
+
+#endif // ADDUSERDIALOG_H
+\end{lstlisting}
+
+adduserdialog.cpp:
+
+\begin{lstlisting}
+#include "adduserdialog.h"
+#include "ui_adduserdialog.h"
+
+AddUserDialog::AddUserDialog(QWidget *parent) :
+    QDialog(parent),
+    ui(new Ui::AddUserDialog)
+{
+    ui->setupUi(this);
+}
+
+AddUserDialog::~AddUserDialog()
+{
+    delete ui;
+}
+//----------------------------------------------------------------------
+
+QString AddUserDialog::getClientName()
+{
+    return ui->leClientName->text();
+}
+//----------------------------------------------------------------------
+
+QString AddUserDialog::getClientAddress()
+{
+    return ui->leClientAddress->text();
+}
+//----------------------------------------------------------------------
+
+int AddUserDialog::getClientPort()
+{
+    return ui->spClientPort->value();
+}
+\end{lstlisting}
