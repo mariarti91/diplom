@@ -4,11 +4,36 @@
 
 Так как для данной системы не существует спроектированных УСПД и ССД для тестирования необходимо реализовать эмуляторы УСПД и ССД. 
 
-\subsection{Эмулятор УСПД}
-
-Для основы эмулятора УСПД был выбран одноплатный компьютер Raspberry Pi B+ под управлением операционной системы Raspbian. Для данного устройство разработана программа, которая ожидает подключения и при появлении запроса на отправку данных формирует пакет со сгенерированными данными в формате, описанном в разделе ``выходные данные'' данной пояснительной записки.
-
 Программа реализована на языке C++ с использованием библиотек Qt. Qt Framework является основным инструментом для разработки ССД и СБД данной системы.
+
+Особенностью Qt является свой подход на обработку событий. Обычно события обрабатываются в том же потоке, что и основная программа. Qt предоставляет механизм сигналов и слотов, которые обрабатываются каждый в своём потоке. Для этого в Qt реализован свой объект QApplicatin, объект которого отвечает за обработку сигналов и слотов. Так как язык C++ не предоставляет средств по работе с сигналами и слотами, в Qt есть абстрактный объект QObject, в котором реализованы макросы для правильной компиляции приложений. Данный объект содержит макросы, которые обрабатываются препроцессором и разворачивают команды работы с сигналами в конструкции, совместимые с C++.
+
+QObject является предком для всех объектов, предоставляемых Qt, все, наследованные от него объект поддерживают использование макросов. Для создания своих объектов, со своими сигналами и слотами необходимо наследовать объекты от QObject, либо другого объекта Qt. При множественном наследовании потомком QObject может быть только один класс-предок. 
+
+Сигналом объекта Qt является метод без реализации, который испускаетя как реакция на какой-либо определенное событие. При описании своих объектов описание сигналов происходит в специальной секцие signal. Для того, что бы испустить сигнал используется специальная команда emit.
+
+Слот - это метод объекта, который можно вызывать как напрямую, так и после испускания определенного сигнала. Слот вызывается каждый раз, как испускается сигнал связанный с ним. Связь сигнала и слота производится при помощи команды connect. Данная команда связывает определеный сигнал определенного объекта с определенным слотом другого (или того же) объекта. Шаблон для создания своих объектов представлен ниже.
+
+\begin{lstlisting}
+ #include <QObject>
+ 
+ class MyObject : public QObject
+ {
+   Q_OBJECT
+ public:
+   explicit MyObject(QObject *parent = 0);
+   ~MyObject();
+   
+ signals:
+   void newVal();
+   
+ slots:
+   void setVal(int val);
+   
+ private:
+   int value;
+ };
+\end{lstlisting}
 
 Сетевое взаимодействие в программах, написанных на языке C++ реализуется при помощи сокетов\cite{cpp}, в Qt для реализации данного взаимодействия используется надстройка над механизмом сокетов, облегчающая реализацию данного взаимодействия.
 
@@ -19,6 +44,64 @@
  \item QTcpServer;
  \item QUdpSocket.
 \end{itemize}
+
+QTcpServer - это объект, предназначенный для обработки сетевых подключений к определенному порту сетевого интерфейса. Задачами объектов типа QTcpServer является прослушивание указанного порта. При появлении входящего подключения данный объект реагирует на это событие созданием объекта QTcpSocket, который отвечает за отправку данных клиенту. 
+
+При появлении подключения объектов типа QTcpServer испускает сигнал newConnection. Данный сигнал связывается с обработчиком новых подключений, в котором создается объект типа QTcpSocket в конструктор которого подается ссылка на сокет, полученная при помощи метода nextPendingConnection() объекта типа QTcpServer. 
+
+Пример обработки нового подключения представлен в листинге ниже.
+
+\begin{lstlisting}
+ MyServer::MyServer(const *int port)
+ {
+   srv->listen(QHostAddress::Any, port);
+   connect(srv, SIGNAL(newConnection()), this, SLOT(newConnect()));
+ }
+ 
+ void MyServer::newConnect()
+ {
+   sc = new QTcpSocket(srv->nextPendingConnection());
+   connect(sc, SIGNAL(readyRead()), this, SLOT(readData()));
+ }
+ 
+ void MyServer::readData()
+ {
+   QByteArray buf(sc->readAll());
+   qDebug() << QString(buf);
+ }
+\end{lstlisting}
+
+В данном примере осуществляется инициализация объекта типа QTcpServer и связывание события появления нового подключения с его обработчиком newConnect(). В обработчике инициализируется объект типа QTcpSocket и происходит связь события о получении данных с его обработчиком readData(). В обработчике readData() происходит считывание всех данных из сокета и выводит их в консоль.
+
+QTcpSocket - это объект, предназначенный для отправления данных при помощи протокола TCP. Объекты данного типа связываются с определенным портом определенного хоста и отправляют данные на этот порт ожидая. Объекты данного типа имеют методы для отправки данных клиенту и сигналы об окончании передачи данных, о наличии новых принятых данных, о разрыве соединения и др.
+
+Для работы с объектом типа QTcpSocket необходимо реализовать обработчики событий. В примере ниже приведен пример использования объектов типа QTcpSocket для создания соединения с удаленным хостом, отправки данных и получения ответа от хоста.
+
+\begin{lstlisting}
+ MySocket::MySocket(const *QString addr, const *int, port)
+ {
+   sc = new QTcpSocket(this);
+   sc->connectToHost(addr, port);
+   connect(sc, SIGNAL(readyRead()), this, SLOT(getData()));
+ }
+ 
+ void MySocket::sendData(QByteArray data)
+ {
+   sc->write(data);
+ }
+ 
+ void MySocket::getData()
+ {
+   QByteArray buf(sc->readAll());
+   qDebug() << QString(buf);
+ }
+\end{lstlisting}
+
+В данном примере создается сокет, который подключается к указанному хосту, а так же связывает сигнал readyRead() со слотом getData(). Слот getData() предназначен для получения данных от хоста и вывода их в консоль. Метод sendData(QByteArray data) отправляет массив данных хосту.
+
+\subsection{Эмулятор УСПД}
+
+Для основы эмулятора УСПД был выбран одноплатный компьютер Raspberry Pi B+ под управлением операционной системы Raspbian. Для данного устройство разработана программа, которая ожидает подключения и при появлении запроса на отправку данных формирует пакет со сгенерированными данными в формате, описанном в разделе ``выходные данные'' данной пояснительной записки.
 
 Для реализации взаимодействия будут использоваться классы QTcpSocket и QTcpServer.
 
@@ -43,7 +126,31 @@ public slots:
 
 Метод initServ предназначен для запуска сервера на определенному порту, передаваемом как аргумент метода.
 
+\begin{lstlisting}
+void TestServ::initServ(const int &port)
+{
+    if(srv->listen(QHostAddress::Any, port))
+    {
+        std::cout << "server up!" << std::endl;
+    }
+    else
+    {
+        std::cout << "ooooooooooops!!!!!" << std::endl;
+    }
+}
+\end{lstlisting}
+
 Слот newConnection срабатывает при подключении к серверу и создает новый объект типа ClienSock для обмена данными с подключенным пользователем.
+
+\begin{lstlisting}
+void TestServ::newConnection()
+{
+    std::cout << "get connection =)" << std::endl;
+    ClientSock * sock = new ClientSock(srv->nextPendingConnection());
+    connect(sock, SIGNAL(scDisconnect(QString)), this, SLOT(connectClosed(QString)));
+    users.insert(sock->getName(), sock);
+}
+\end{lstlisting}
 
 Прототип объекта ClienSock:
 
@@ -66,59 +173,50 @@ public slots:
 
 В конструкторе создается копия сокета, по которому происходит обмен данными с клиентом.
 
+\begin{lstlisting}
+ClientSock::ClientSock(QTcpSocket *sock, QObject *parent) :
+    QObject(parent)
+{
+    sc = sock;
+    this->setName(QString("%1").arg(sock->peerPort()));
+    connect(sc, SIGNAL(readyRead()), this, SLOT(getData()));
+    startTimer(5000);
+}
+\end{lstlisting}
+
 Слот getData срабатывает при получении данных от клиента. После чего запрос обрабатывается и происходит отправка ответа.
+
+\begin{lstlisting}
+QByteArray ClientSock::getData()
+{
+    QByteArray buf(sc->readAll());
+    std::cout << m_qsScName.toStdString() << ": " << QString(buf).toStdString() << std::endl;
+    quint16 uspdId = 0x0003;
+    QString uspdData("it's USPD status");
+    QString uuData("it's UU data");
+    QByteArray responce;
+    QDataStream res(&responce, QIODevice::WriteOnly);
+    res << uspdId << uspdData.toUtf8() << uuData.toUtf8();
+    sendData(responce);
+    this->deleteLater();
+    return buf;
+}
+\end{lstlisting}
 
 Метод sendData отправляет массив байт клиенту.
 
-Так как данная программа только эмулирует действия УСПД, присвоим ему ID = 3, состояние УСПД представим строкой символов ``it's USPD status'', а показания УУ строкой символов ``it's UU data''.
+\begin{lstlisting}
+void ClientSock::sendData(QByteArray data)
+{
+    if(sc->state() == QAbstractSocket::ConnectedState)
+    {
+        sc->write(data);
+        sc->waitForBytesWritten();
+    }
+} 
+\end{lstlisting}
 
-% \subsection{Взаимодействие с УСПД}
-% 
-% Для сетевого взаимодействия с УСПД была создана программа с графическим итерфейсом. Задачей данной программы является установление соединения с определенным адресом и получением/отправкой текстовой информации.
-% 
-% Прототип объекта, решающего эту задачу, выглядит так:
-% 
-% \begin{lstlisting}
-% class EmulSocket : public QObject
-% {
-%     Q_OBJECT
-% public:
-%     explicit EmulSocket(QObject *parent = 0);
-%     ~EmulSocket();
-%     void configure(QString, int);
-%     void initSocket();
-%     void sendData(QByteArray);
-% 
-% private:
-%     QString qs_Address;
-%     int i_Port;
-%     QTcpSocket * sc;
-% signals:
-%     void haveData(QString);
-% public slots:
-%     QString getData();
-% };
-% \end{lstlisting}
-% 
-% В конструкторе и диструкторе объекта инициализируется и уничтожается объект QTcpSocket *sc.
-% 
-% Метод configure(QString, int) заполняет значения ip-адреса и порта назначения (поля qs\_Address и i\_Port соответственно), так же в данном методе происходит связывание события ``приняты данные'' с обработчиком этого события - методом getData(). После чего вызывается метод initSocket().
-% 
-% Метод initSocket() отвечает за установление соединения с указанным хостом.
-% 
-% Метод sendData(QByteArray) - это функция, отправляющая полученный массив байт по адресу назначения.
-% 
-% Сигнал haveData(QString) - это вспомогательный сигнал для взаимодействия объекта с графическим интерфейсом.
-% 
-% Метод getData() обрабатывает входящий поток данный и при получении данных испускает сигнал haveData(QString) в котором передает полученные данные.
-% 
-% Интерфейс программы представлен на рисунке \ref{window1:window1}.
-% 
-% \begin{figure}[h!]
-%  \center{\includegraphics[width=0.8\linewidth]{window1}}
-%  \caption{Подключение к эмулятору УСПД}
-%  \label{window1:window1}
-% \end{figure}
+Так как данная программа только эмулирует действия УСПД, присвоим ему ID = 3, состояние УСПД представим строкой символов ``it's USPD status'', а показания УУ строкой символов ``it's UU data''.
 
 \subsection{Эмулятор ССД}
 
@@ -149,13 +247,52 @@ private:
 };
 \end{lstlisting}
 
-В конструкторе данного класса запускается таймер, которй отсчитывает интервалы времени между опросами списка клиентов. При обнулении таймера вызывается метод timerEvent в котором и происходит опрос списка клиентов, хранящегося в QMap<QString, ClientAddress>, ClientAddress - структура данных, хранящая ip-адрес и порт назначения.
+В конструкторе данного класса запускается таймер, которй отсчитывает интервалы времени между опросами списка клиентов. 
+
+\begin{lstlisting}
+MyServer::MyServer(QObject *parent) :
+    QObject(parent)
+{
+    startTimer(10000);
+}
+\end{lstlisting}
+
+При обнулении таймера вызывается метод timerEvent в котором и происходит опрос списка клиентов, хранящегося в QMap<QString, ClientAddress>, ClientAddress - структура данных, хранящая ip-адрес и порт назначения.
+
+timerEvent - метод, который просматривает список клиентов, для каждого клиента создает свое объект типа ClienSock(описан ранее), посылает клиенту массив байт, и отключается. 
+
+\begin{lstlisting}
+void MyServer::timerEvent(QTimerEvent *event)
+{
+    std::cout << "event!" << std::endl;
+    foreach (QString name, this->clients.keys())
+    {
+        ClientSock* sc = new ClientSock(clients.value(name).addr, clients.value(name).port);
+        sc->setName(name);
+        sc->sendData("get_request");
+    }
+}
+\end{lstlisting}
 
 Метод addClient принимает имея, ip-адрес и порт клиента, которого необходимо добавить в список и создает новый элемент в объекте clients.
 
+\begin{lstlisting}
+ void MyServer::addClient(const QString &name,
+                         const QString &addr,
+                         const int &port)
+{
+    clients.insert(name, ClientAddress(addr, port));
+}
+\end{lstlisting}
+
 getClientsList - метод, возвращающий атрибут clients.
 
-timerEvent - метод, который просматривает список клиентов, для каждого клиента создает свое объект типа ClienSock(описан ранее), посылает клиенту массив байт, и отключается. 
+\begin{lstlisting}
+QMap<QString, ClientAddress>* MyServer::getClientsList()
+{
+    return &clients;
+}
+\end{lstlisting}
 
 Графический интерфейс программы представлен на рисунку \ref{server_gui:server_gui}.
 
@@ -165,6 +302,7 @@ timerEvent - метод, который просматривает список 
  \label{server_gui:server_gui}
 \end{figure}
 
+\newpage
 Реакция эмулятора УСПД на user1 представлена на рисунке \ref{client_log:client_log}.
 
 \begin{figure}[ht!]
@@ -194,3 +332,4 @@ timerEvent - метод, который просматривает список 
 \end{itemize}
 
 На основании разбора можно сделать вывод что сформированный пакет совпадает со структурой пакета, описанной в разделе ``выходные данные''.
+
